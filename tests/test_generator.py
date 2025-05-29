@@ -169,77 +169,56 @@ class TestJournalGenerator(unittest.TestCase):
     def test_generated_text_cleaning_and_truncation(self):
         """Test that generated text is cleaned and then potentially truncated by utils."""
         raw_llm_output = "  This is a mock response that is deliberately a bit too long for the target word count. It needs to be truncated.  "
-        # Note: The old test had "New Journal Entry:" which was stripped by the generator. 
-        # The new generator logic has the LLM omit this, so clean_generated_text primarily strips whitespace.
         
-        target_word_count = 10 # Target for truncation
-        # Heuristic from generator for max_overshoot_words: int(avg_word_count*0.10)
-        expected_max_overshoot_words = int(target_word_count * 0.10) 
-
+        target_word_count_unused = 10 # This variable seems unused in the actual logic below, main targets are forced_target_word_count and target_good_length
+        
         # Configure the mock Gemini response for this test
         mock_response = MagicMock(spec=genai.types.GenerateContentResponse)
         mock_response.text = raw_llm_output
         self.mock_model_instance.generate_content.return_value = mock_response
         
-        # We will patch the actual utils functions to assert they are called correctly
-        # and to control their output for focused testing of the generator's logic.
         with patch.object(utils, 'clean_generated_text', return_value=raw_llm_output.strip()) as mock_clean:
-            # Let smart_truncate_text run, but we can check its call if needed, or check its effect.
-            # For this test, let's assume smart_truncate_text works as per its own unit tests,
-            # and focus on the fact that generate_entry uses it correctly when text is too long.
-            # To make the test more specific to the generator's branching logic for truncation:
+            # Scenario 1: Text is too long (based on 50% tolerance) and needs truncation
+            text_that_is_too_long_after_cleaning = "This is cleaned but still very very very very very very long and needs truncation for sure it really does." # count_words (split) = 20
+            forced_target_word_count = 10 # Target for the generator to aim for
+            # Word count (20) vs target (10): 20 is > 10 * 1.5 (15), so it's outside 50% tolerance. Truncation expected.
             
-            # Scenario 1: Text is too long and needs truncation
-            # Make clean_generated_text return something that IS too long
-            text_that_is_too_long_after_cleaning = "This is cleaned but still very very long and needs truncation for sure."
-            # utils.count_words(text_that_is_too_long_after_cleaning) -> 12. Target is 10. 20% tolerance is 8-12. So this should be adherent.
-            # Let's make it longer to force truncation: target 5, actual 12
-            forced_target_word_count = 5
-            expected_max_overshoot_for_forced = int(forced_target_word_count * 0.10) # which is 0
-            mock_clean.return_value = text_that_is_too_long_after_cleaning # Output of clean
+            expected_max_overshoot_for_smart_truncate = int(forced_target_word_count * 0.10) # This is for smart_truncate_text's internal check
+            mock_clean.return_value = text_that_is_too_long_after_cleaning 
             
-            # Expected output after smart_truncate_text if it were called with this input:
-            # utils.smart_truncate_text(text_that_is_too_long_after_cleaning, forced_target_word_count, expected_max_overshoot_for_forced)
-            # words = ["This", "is", "cleaned", "but", "still", "very", "very", "long", "and", "needs", "truncation", "for", "sure", "."]
-            # truncated_words = words[:5] -> ["This", "is", "cleaned", "but", "still"]
-            # expected_truncated_text = "This is cleaned but still"
-
-            # Patch smart_truncate_text to control its output and check its args for this specific path
             with patch.object(utils, 'smart_truncate_text', return_value="Successfully Truncated Text.") as mock_smart_truncate:
                 generated_text = self.generator.generate_entry(
                     target_emotion="test_truncation", 
-                    avg_word_count=forced_target_word_count 
-                    # max_new_tokens will be calculated by the generator based on avg_word_count
+                    avg_word_count=forced_target_word_count
                 )
                 
-                mock_clean.assert_called_with(raw_llm_output) # Called with raw LLM output
-                # smart_truncate_text should be called because text_that_is_too_long_after_cleaning (12 words) 
-                # is outside tolerance for forced_target_word_count (5 words). (5 +/- 20% is 4-6 words)
-                mock_smart_truncate.assert_called_once_with(text_that_is_too_long_after_cleaning, forced_target_word_count, max_overshoot_words=expected_max_overshoot_for_forced)
+                mock_clean.assert_called_with(raw_llm_output)
+                mock_smart_truncate.assert_called_once_with(
+                    text_that_is_too_long_after_cleaning, 
+                    forced_target_word_count, 
+                    max_overshoot_words=expected_max_overshoot_for_smart_truncate
+                )
                 self.assertEqual(generated_text, "Successfully Truncated Text.")
 
-        # Scenario 2: Text is within tolerance and should not be truncated
-        self.mock_model_instance.generate_content.reset_mock() # Reset call count for generate_content
-        # mock_clean.reset_mock() # No longer needed as we will re-patch
+        # Scenario 2: Text is within 50% tolerance and should not be truncated
+        self.mock_model_instance.generate_content.reset_mock() 
         
-        text_that_is_good_length = "This text is a good length."
-        # utils.count_words(text_that_is_good_length) -> 6. Target 6, 20% tolerance is ~5-7. Adherent.
-        target_good_length = 6
+        text_that_is_good_length = "This text is a pretty good length, not too long not too short just right."
+        # count_words (split) for text_that_is_good_length = 13
+        target_good_length = 10
+        # Word count (13) vs target (10): 13 is <= 10 * 1.5 (15), so it's within 50% tolerance. No truncation expected.
         
-        # Configure the mock Gemini response for Scenario 2
         mock_response_scenario2 = MagicMock(spec=genai.types.GenerateContentResponse)
-        mock_response_scenario2.text = text_that_is_good_length # LLM returns this
+        mock_response_scenario2.text = text_that_is_good_length 
         self.mock_model_instance.generate_content.return_value = mock_response_scenario2
 
-        # Patch utils.clean_generated_text specifically for this scenario
         with patch.object(utils, 'clean_generated_text', return_value=text_that_is_good_length) as mock_clean_scenario2:
             with patch.object(utils, 'smart_truncate_text') as mock_smart_truncate_not_called:
                 generated_text = self.generator.generate_entry(
                     target_emotion="test_no_truncation",
                     avg_word_count=target_good_length
                 )
-                # clean_generated_text is called with the raw output from the LLM mock
-                mock_clean_scenario2.assert_called_once_with(text_that_is_good_length) 
+                mock_clean_scenario2.assert_called_once_with(text_that_is_good_length)
                 mock_smart_truncate_not_called.assert_not_called()
                 self.assertEqual(generated_text, text_that_is_good_length)
 

@@ -38,7 +38,7 @@ def clean_generated_text(text: str) -> str:
     return text
 
 def count_words(text: str) -> int:
-    """Counts the number of words in a text using nltk.word_tokenize."""
+    """Counts the number of words in a text by splitting on whitespace."""
     if not text:
         return 0
     return len(text.split())
