@@ -1,0 +1,10 @@
+transformers
+torch
+pandas
+nltk
+scikit-learn
+huggingface_hub
+bitsandbytes
+accelerate
+google-generativeai
+python-dotenv 
