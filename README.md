@@ -87,7 +87,7 @@ Follow these steps to set up and run the journal generator:
 **5. Set up Google API Key:**
    The generator uses the Google Gemini API, which requires an API key.
    *   Obtain an API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
-   *   In the root directory of the project (`journal_generator/`), create a file named `.env`.
+   *   In the root directory of the project (`journal_generator/`), duplicate the `.env.example` file and name it `.env`.
    *   Add your API key to the `.env` file in the following format:
      ```
      GOOGLE_API_KEY="YOUR_ACTUAL_API_KEY_HERE"
