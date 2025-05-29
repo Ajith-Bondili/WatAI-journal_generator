@@ -14,13 +14,13 @@ if __package__:
     from .data_loader import load_and_preprocess_data, get_examples_for_prompt, ALL_AVAILABLE_EMOTIONS
     from .generator import JournalGenerator
     from .exporter import JournalExporter
-    from .utils import get_current_datetime_str # For default start date
+    # from .utils import get_current_datetime_str # No longer needed for default start date
 else:
     # Allow running directly from src/ for simplified testing, assuming other files are in the same dir
     from data_loader import load_and_preprocess_data, get_examples_for_prompt, ALL_AVAILABLE_EMOTIONS
     from generator import JournalGenerator
     from exporter import JournalExporter
-    from utils import get_current_datetime_str
+    # from utils import get_current_datetime_str # No longer needed for default start date
 
 DEFAULT_OUTPUT_DIR = "generated_entries"
 
@@ -105,6 +105,7 @@ def main():
 
     print("\n--- Starting Journal Entry Generation ---")
     total_entries_generated = 0
+    # Use datetime.now().strftime("%Y%m%d") directly for default start date if not provided
     current_date_obj = datetime.strptime(args.start_date, "%Y%m%d") if args.start_date else datetime.now()
 
     for day_num in range(args.num_days):
@@ -134,10 +135,7 @@ def main():
 
             if generated_text:
                 saved_file = exporter.save_entry(
-                    entry_text=generated_text,
-                    date_str=date_str,
-                    entry_index_in_day=entry_num_in_day,
-                    total_entries_for_day=args.entries_per_day
+                    entry_text=generated_text
                 )
                 if saved_file:
                     total_entries_generated += 1

@@ -2,19 +2,23 @@ import datetime
 import re
 from nltk.tokenize import word_tokenize, sent_tokenize
 
-def get_current_datetime_str(format_str="%Y%m%d") -> str:
-    """Returns the current date as a string, formatted as YYYYMMDD."""
-    return datetime.datetime.now().strftime(format_str)
+# def get_current_datetime_str(format_str="%Y%m%d") -> str:
+#     """Returns the current date as a string, formatted as YYYYMMDD."""
+#     return datetime.datetime.now().strftime(format_str)
 
-def generate_file_id(entry_index: int, total_entries_for_day: int) -> str:
-    """Generates a unique ID for an entry within a day, e.g., 001, 002."""
-    # Determine padding based on the total number of entries for the day
-    padding = len(str(total_entries_for_day))
-    return f"{entry_index:0{padding}d}"
+def get_current_datetime_str_for_file_id() -> str:
+    """Returns the current datetime as a string suitable for a unique file ID: YYYYMMDD_HHMMSSffffff."""
+    return datetime.datetime.now().strftime("%Y%m%d_%H%M%S%f")
 
-def construct_filename(date_str: str, file_id: str, prefix: str = "journal") -> str:
-    """Constructs the filename, e.g., journal_YYYYMMDD_id.txt."""
-    return f"{prefix}_{date_str}_{file_id}.txt"
+# generate_file_id is no longer used by the exporter, can be deprecated/removed if not used elsewhere
+# def generate_file_id(entry_index: int, total_entries_for_day: int) -> str:
+#     """Generates a unique ID for an entry within a day, e.g., 001, 002."""
+#     padding = len(str(total_entries_for_day))
+#     return f"{entry_index:0{padding}d}"
+
+def construct_filename(unique_id_str: str, prefix: str = "journal") -> str:
+    """Constructs the filename using a unique ID string, e.g., journal_YYYYMMDD_HHMMSSffffff.txt."""
+    return f"{prefix}_{unique_id_str}.txt"
 
 def clean_generated_text(text: str) -> str:
     """
@@ -98,17 +102,17 @@ def smart_truncate_text(text: str, target_word_count: int, max_overshoot_words: 
 
 if __name__ == '__main__':
     print("--- Utils Test ---")
-    current_date = get_current_datetime_str()
+    current_date = get_current_datetime_str_for_file_id()
     print(f"Current date string: {current_date}")
 
-    file_id_1 = generate_file_id(1, 10)
-    file_id_10 = generate_file_id(10, 10)
-    file_id_5_of_100 = generate_file_id(5, 100)
-    print(f"File ID (1 of 10): {file_id_1}")
-    print(f"File ID (10 of 10): {file_id_10}")
-    print(f"File ID (5 of 100): {file_id_5_of_100}")
+    # file_id_1 = generate_file_id(1, 10)
+    # file_id_10 = generate_file_id(10, 10)
+    # file_id_5_of_100 = generate_file_id(5, 100)
+    # print(f"File ID (1 of 10): {file_id_1}")
+    # print(f"File ID (10 of 10): {file_id_10}")
+    # print(f"File ID (5 of 100): {file_id_5_of_100}")
 
-    filename = construct_filename(current_date, file_id_1)
+    filename = construct_filename(current_date)
     print(f"Constructed filename: {filename}")
 
     raw_text = "  New Journal Entry: This is a test. It has some words.  \nThis is another sentence. "

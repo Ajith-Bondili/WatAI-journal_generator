@@ -1,109 +1,209 @@
 import unittest
+from unittest.mock import patch, mock_open, MagicMock
 import pandas as pd
 import os
-
-# Add src to Python path if tests are run from project root
 import sys
-# This navigates up to the project root (journal_generator) then down to src
-# Adjust if your test runner or project structure is different
+
+# Add src to Python path
 SRC_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'src')
 if SRC_PATH not in sys.path:
     sys.path.append(SRC_PATH)
 
-try:
-    from data_loader import load_and_preprocess_data, get_examples_for_prompt, ALL_AVAILABLE_EMOTIONS
-except ImportError:
-    print("Failed to import from data_loader. Ensure PYTHONPATH is set correctly or tests are run from a suitable directory.")
-    # Fallback for cases where the test runner might have issues with relative imports
-    # This is less ideal but can help in some CI environments or complex setups
-    if 'data_loader' not in sys.modules:
-        raise
+# It's crucial that this import happens *after* sys.path is potentially modified,
+# and that data_loader.py itself doesn't try to load data at import time in a way
+# that would break tests if the real data file isn't there.
+from data_loader import load_and_preprocess_data, get_examples_for_prompt, ALL_AVAILABLE_EMOTIONS, EMOTION_COLUMNS, LOCAL_DATA_FILE
 
-# This module might require KAGGLE_API_KEY to be set up to run tests that load data.
-# Consider using a mock or a small, local dummy CSV for tests to avoid Kaggle dependency during unit testing.
-
-@unittest.skipIf("KAGGLE_USERNAME" not in os.environ or "KAGGLE_KEY" not in os.environ,
-                 "Kaggle API credentials not found in environment. Skipping data_loader tests that require downloads.")
 class TestDataLoader(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        """Load data once for all tests in this class if Kaggle API is available."""
-        print("Attempting to load data for TestDataLoader...")
-        try:
-            cls.df = load_and_preprocess_data()
-            print(f"Data loaded for tests. Shape: {cls.df.shape}")
-        except Exception as e:
-            print(f"Failed to load data in setUpClass for TestDataLoader: {e}")
-            cls.df = None # Ensure df is None if loading fails
+    def _create_sample_df(self, data_dict=None):
+        """Helper to create a sample DataFrame for testing."""
+        if data_dict is None:
+            data_dict = {
+                'Answer': ["Entry 1", "Entry 2", "Entry 3", "Entry 4", "Entry 5"],
+                'Answer.f1.happy.raw': ['TRUE', 'FALSE', 'TRUE', 'FALSE', 'TRUE'],
+                'Answer.f1.sad.raw': ['FALSE', 'TRUE', 'FALSE', 'TRUE', 'FALSE'],
+                'Answer.f1.anxious.raw': ['TRUE', 'TRUE', 'FALSE', 'FALSE', 'NAN'], # Test NAN
+                'Answer.f1.proud.raw': [1, 0, 1, 0, 0] 
+            }
+        return pd.DataFrame(data_dict)
 
-    def test_load_and_preprocess_data_returns_dataframe(self):
-        """Test that data loading returns a pandas DataFrame."""
-        if self.df is None:
-            self.skipTest("Dataframe not loaded, skipping test_load_and_preprocess_data_returns_dataframe")
-        self.assertIsInstance(self.df, pd.DataFrame)
-        self.assertGreater(len(self.df), 0, "DataFrame should not be empty.")
+    @patch('data_loader.pd.read_csv')
+    @patch('data_loader.os.path.exists')
+    def test_load_and_preprocess_data_success(self, mock_exists, mock_read_csv):
+        """Test successful loading and preprocessing of data."""
+        mock_exists.return_value = True
+        sample_df = self._create_sample_df()
+        mock_read_csv.return_value = sample_df.copy() # Use a copy
 
-    def test_answer_column_exists(self):
-        """Test that the 'Answer' column exists after loading."""
-        if self.df is None:
-            self.skipTest("Dataframe not loaded, skipping test_answer_column_exists")
-        self.assertIn('Answer', self.df.columns)
+        df = load_and_preprocess_data()
 
-    def test_emotion_columns_are_boolean(self):
-        """Test that known emotion columns are converted to boolean type."""
-        if self.df is None:
-            self.skipTest("Dataframe not loaded, skipping test_emotion_columns_are_boolean")
+        mock_exists.assert_called_once_with(LOCAL_DATA_FILE)
+        mock_read_csv.assert_called_once_with(LOCAL_DATA_FILE)
+        self.assertIsInstance(df, pd.DataFrame)
+        self.assertFalse(df.empty)
+        self.assertIn('Answer', df.columns)
         
-        # Check a sample of emotion columns
-        sample_emotion_cols = ['Answer.f1.happy.raw', 'Answer.f1.sad.raw']
-        for col_name in sample_emotion_cols:
-            if col_name in self.df.columns:
-                self.assertTrue(pd.api.types.is_bool_dtype(self.df[col_name]),
-                                f"Column {col_name} should be boolean type.")
-            else:
-                self.fail(f"Expected emotion column {col_name} not found in DataFrame.")
-
-    def test_get_examples_for_prompt(self):
-        """Test fetching example prompts for a known emotion."""
-        if self.df is None:
-            self.skipTest("Dataframe not loaded, skipping test_get_examples_for_prompt")
-
-        # Test with a common emotion expected to have examples
-        happy_examples = get_examples_for_prompt(self.df, 'happy', num_examples=2)
-        self.assertIsInstance(happy_examples, list)
-        if not self.df[self.df['Answer.f1.happy.raw'] == True].empty: # If happy entries exist
-            self.assertEqual(len(happy_examples), 2, "Should return 2 examples for 'happy' if available.")
-            if happy_examples:
-                self.assertIsInstance(happy_examples[0], str)
-        else:
-            print("Skipping num_examples check for 'happy' as no entries were found in source for this test run.")
-
-    def test_get_examples_for_prompt_nonexistent_emotion(self):
-        """Test fetching examples for an emotion string not in dataset columns."""
-        if self.df is None:
-            self.skipTest("Dataframe not loaded, skipping test_get_examples_for_prompt_nonexistent_emotion")
+        # Test boolean conversion
+        self.assertTrue(pd.api.types.is_bool_dtype(df['Answer.f1.happy.raw']))
+        self.assertEqual(df['Answer.f1.happy.raw'].tolist(), [True, False, True, False, True])
         
-        # This should return an empty list and print a warning (checked manually)
-        non_existent_examples = get_examples_for_prompt(self.df, 'nonexistentemotion', num_examples=2)
-        self.assertEqual(len(non_existent_examples), 0)
+        self.assertTrue(pd.api.types.is_bool_dtype(df['Answer.f1.sad.raw']))
+        self.assertEqual(df['Answer.f1.sad.raw'].tolist(), [False, True, False, True, False])
 
-    def test_get_examples_for_prompt_zero_examples(self):
-        """Test requesting zero examples."""
-        if self.df is None:
-            self.skipTest("Dataframe not loaded, skipping test_get_examples_for_prompt_zero_examples")
-        zero_examples = get_examples_for_prompt(self.df, 'happy', num_examples=0)
-        self.assertEqual(len(zero_examples), 0)
-    
+        self.assertTrue(pd.api.types.is_bool_dtype(df['Answer.f1.anxious.raw']))
+        self.assertEqual(df['Answer.f1.anxious.raw'].tolist(), [True, True, False, False, False]) # NAN becomes False
+
+        # Test numeric to boolean conversion for a column defined in EMOTION_COLUMNS
+        self.assertTrue(pd.api.types.is_bool_dtype(df['Answer.f1.proud.raw']))
+        self.assertEqual(df['Answer.f1.proud.raw'].tolist(), [True, False, True, False, False])
+        
+        # Test Answer column stripping (if applicable, though not explicitly in current data_loader)
+        # For now, just check it's string
+        self.assertTrue(all(isinstance(x, str) for x in df['Answer']))
+
+
+    @patch('data_loader.os.path.exists')
+    def test_load_and_preprocess_data_file_not_found(self, mock_exists):
+        """Test FileNotFoundError when data file doesn't exist."""
+        mock_exists.return_value = False
+        with self.assertRaises(FileNotFoundError):
+            load_and_preprocess_data()
+        mock_exists.assert_called_once_with(LOCAL_DATA_FILE)
+
+    @patch('data_loader.pd.read_csv')
+    @patch('data_loader.os.path.exists')
+    def test_load_and_preprocess_data_missing_answer_column(self, mock_exists, mock_read_csv):
+        """Test KeyError if 'Answer' column is missing."""
+        mock_exists.return_value = True
+        # Create a DataFrame without the 'Answer' column
+        bad_data = {
+            'Answer.f1.happy.raw': ['TRUE', 'FALSE'],
+            # Missing 'Answer' column
+        }
+        mock_read_csv.return_value = pd.DataFrame(bad_data)
+        with self.assertRaises(KeyError):
+            load_and_preprocess_data()
+
+    @patch('data_loader.pd.read_csv')
+    @patch('data_loader.os.path.exists')
+    def test_load_and_preprocess_data_handles_missing_emotion_cols(self, mock_exists, mock_read_csv):
+        """Test that missing emotion columns are handled gracefully (warning printed)."""
+        mock_exists.return_value = True
+        # Create a DataFrame with only 'Answer' and one emotion column
+        partial_data = {
+            'Answer': ["Entry 1", "Entry 2"],
+            'Answer.f1.happy.raw': ['TRUE', 'FALSE'],
+            # Other EMOTION_COLUMNS are missing
+        }
+        mock_df = pd.DataFrame(partial_data)
+        mock_read_csv.return_value = mock_df.copy()
+
+        # Patch print to capture warnings
+        with patch('builtins.print') as mock_print:
+            df = load_and_preprocess_data()
+        
+        self.assertIn('Answer.f1.happy.raw', df.columns)
+        self.assertTrue(pd.api.types.is_bool_dtype(df['Answer.f1.happy.raw']))
+        
+        # Check that warnings were printed for missing columns
+        # This depends on the exact warning message in data_loader.py
+        missing_col_warnings = 0
+        for expected_col in EMOTION_COLUMNS:
+            if expected_col not in partial_data: # If it was truly missing from input
+                 # Check if a warning about this specific column was printed
+                self.assertTrue(any(f"Warning: Emotion column {expected_col} not found" in call_args.args[0] 
+                                   for call_args in mock_print.call_args_list),
+                                   f"Expected warning for missing column {expected_col} not found.")
+                missing_col_warnings +=1
+        self.assertGreater(missing_col_warnings, 0, "Should have printed warnings for missing emotion columns")
+
+
+    def test_get_examples_for_prompt_success(self):
+        """Test successfully fetching examples."""
+        sample_df = self._create_sample_df({
+            'Answer': ["Happy Day", "Joyful Times", "Sunny Entry", "Sad Story", "Blue Mood"],
+            'Answer.f1.happy.raw': [True, True, True, False, False],
+            'Answer.f1.sad.raw': [False, False, False, True, True]
+        })
+        examples = get_examples_for_prompt(sample_df, 'happy', num_examples=2)
+        self.assertEqual(len(examples), 2)
+        for ex in examples:
+            self.assertIn(ex, ["Happy Day", "Joyful Times", "Sunny Entry"])
+
+        # Test case insensitivity for emotion
+        examples_case = get_examples_for_prompt(sample_df, 'HAPPY', num_examples=1)
+        self.assertEqual(len(examples_case), 1)
+        self.assertIn(examples_case[0], ["Happy Day", "Joyful Times", "Sunny Entry"])
+
+
+    def test_get_examples_for_prompt_fewer_than_requested(self):
+        """Test fetching when fewer examples exist than requested."""
+        sample_df = self._create_sample_df({
+            'Answer': ["One Happy Entry", "Other stuff"],
+            'Answer.f1.happy.raw': [True, False],
+            'Answer.f1.sad.raw': [False, True]
+        })
+        with patch('builtins.print') as mock_print: # To check for warning
+            examples = get_examples_for_prompt(sample_df, 'happy', num_examples=3)
+        self.assertEqual(len(examples), 1)
+        self.assertEqual(examples[0], "One Happy Entry")
+        self.assertTrue(any("Warning: Found only 1 entries for emotion 'happy'" in call_args.args[0] 
+                            for call_args in mock_print.call_args_list))
+
+    def test_get_examples_for_prompt_no_examples_found(self):
+        """Test fetching when no examples exist for the emotion."""
+        sample_df = self._create_sample_df({
+            'Answer': ["All Sad Here", "Very Blue"],
+            'Answer.f1.happy.raw': [False, False], # No happy entries
+            'Answer.f1.sad.raw': [True, True]
+        })
+        with patch('builtins.print') as mock_print: # To check for message
+            examples = get_examples_for_prompt(sample_df, 'happy', num_examples=2)
+        self.assertEqual(len(examples), 0)
+        self.assertTrue(any("No entries found for emotion: happy" in call_args.args[0]
+                            for call_args in mock_print.call_args_list))
+
+    def test_get_examples_for_prompt_nonexistent_emotion_column(self):
+        """Test fetching for an emotion whose column doesn't exist in the DataFrame."""
+        sample_df = self._create_sample_df() # Standard columns
+        with patch('builtins.print') as mock_print: # To check for warning
+            examples = get_examples_for_prompt(sample_df, 'nonexistentemotion', num_examples=2)
+        self.assertEqual(len(examples), 0)
+        self.assertTrue(any("Warning: Emotion column for 'nonexistentemotion' (Answer.f1.nonexistentemotion.raw) not found" 
+                            in call_args.args[0] for call_args in mock_print.call_args_list))
+
+    def test_get_examples_for_prompt_zero_examples_requested(self):
+        """Test requesting zero examples returns an empty list."""
+        sample_df = self._create_sample_df()
+        examples = get_examples_for_prompt(sample_df, 'happy', num_examples=0)
+        self.assertEqual(len(examples), 0)
+
+    def test_get_examples_for_prompt_emotion_column_not_boolean(self):
+        """Test behavior when the target emotion column is not boolean and cannot be converted."""
+        sample_df = pd.DataFrame({
+            'Answer': ["Entry A", "Entry B"],
+            'Answer.f1.weird.raw': ["Yes", "No"] # Not TRUE/FALSE, not 0/1
+        })
+        with patch('builtins.print') as mock_print:
+            examples = get_examples_for_prompt(sample_df, 'weird', num_examples=1)
+        self.assertEqual(len(examples), 0)
+        self.assertTrue(any("Warning: Emotion column Answer.f1.weird.raw is not boolean." in call_args.args[0]
+                            for call_args in mock_print.call_args_list))
+
     def test_all_available_emotions_list(self):
         """Test that ALL_AVAILABLE_EMOTIONS is a non-empty list of strings."""
         self.assertIsInstance(ALL_AVAILABLE_EMOTIONS, list)
         self.assertGreater(len(ALL_AVAILABLE_EMOTIONS), 0)
         self.assertTrue(all(isinstance(emotion, str) for emotion in ALL_AVAILABLE_EMOTIONS))
-        self.assertIn("happy", ALL_AVAILABLE_EMOTIONS) # Check for a known emotion
+        # Check for a few known emotions based on EMOTION_COLUMNS
+        self.assertIn("happy", ALL_AVAILABLE_EMOTIONS)
+        self.assertIn("sad", ALL_AVAILABLE_EMOTIONS)
+        self.assertIn("afraid", ALL_AVAILABLE_EMOTIONS)
+        # Check a more complex one to ensure splitting worked
+        self.assertTrue(any(col.split('.')[2] == "surprised" for col in EMOTION_COLUMNS))
+        self.assertIn("surprised", ALL_AVAILABLE_EMOTIONS)
+
 
 if __name__ == '__main__':
-    # This allows running the tests directly using `python tests/test_data_loader.py`
-    # Ensure that the src directory is in PYTHONPATH or adjust sys.path as done above.
-    print(f"Current sys.path for test_data_loader: {sys.path}")
     unittest.main() 

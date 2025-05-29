@@ -7,4 +7,5 @@ huggingface_hub
 bitsandbytes
 accelerate
 google-generativeai
-python-dotenv 
+python-dotenv
+pytest 
