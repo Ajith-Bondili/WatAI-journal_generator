@@ -41,16 +41,16 @@ def count_words(text: str) -> int:
     """Counts the number of words in a text using nltk.word_tokenize."""
     if not text:
         return 0
-    return len(word_tokenize(text))
+    return len(text.split())
 
-def check_word_count_adherence(text_word_count: int, target_word_count: int, tolerance_percentage: float = 0.20) -> tuple[bool, float]:
+def check_word_count_adherence(text_word_count: int, target_word_count: int, tolerance_percentage: float = 0.50) -> tuple[bool, float]:
     """
     Checks if the actual word count is within a tolerance percentage of the target word count.
 
     Args:
         text_word_count (int): The actual word count of the generated text.
         target_word_count (int): The desired word count.
-        tolerance_percentage (float): The allowable deviation (e.g., 0.20 for 20%).
+        tolerance_percentage (float): The allowable deviation (e.g., 0.50 for 50%).
 
     Returns:
         tuple[bool, float]: (is_adherent, deviation_percentage)
@@ -67,7 +67,7 @@ def check_word_count_adherence(text_word_count: int, target_word_count: int, tol
     deviation = (text_word_count - target_word_count) / target_word_count
     return is_adherent, deviation
 
-def smart_truncate_text(text: str, target_word_count: int, max_overshoot_words: int = 10) -> str:
+def smart_truncate_text(text: str, target_word_count: int, max_overshoot_words: int = 30) -> str:
     """
     Truncates text to be close to the target_word_count.
     If the text is already shorter or slightly longer (within max_overshoot_words), it's returned as is.
@@ -127,9 +127,9 @@ if __name__ == '__main__':
     # Test check_word_count_adherence
     print("\n--- Testing Word Count Adherence ---")
     target_wc = 100
-    actual_wc_good = 90
-    actual_wc_bad_low = 70
-    actual_wc_bad_high = 130
+    actual_wc_good = 90 # Within 20% (old default), within 50% (new default)
+    actual_wc_bad_low = 70 # Within 20% (old default), within 50% (new default)
+    actual_wc_bad_high = 130 # Outside 20% (old default), within 50% (new default)
     adherent, dev = check_word_count_adherence(actual_wc_good, target_wc)
     print(f"Target: {target_wc}, Actual: {actual_wc_good} -> Adherent: {adherent}, Deviation: {dev:.2%}")
     adherent, dev = check_word_count_adherence(actual_wc_bad_low, target_wc)

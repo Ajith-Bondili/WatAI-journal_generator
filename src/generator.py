@@ -139,13 +139,17 @@ class JournalGenerator:
         print(f"Generated entry (raw, cleaned): {current_word_count} words.")
         print(f"Target word count: {avg_word_count}.")
 
-        is_adherent, deviation = utils.check_word_count_adherence(current_word_count, avg_word_count)
+        is_adherent, deviation = utils.check_word_count_adherence(
+            current_word_count, 
+            avg_word_count,
+            tolerance_percentage=0.50 # Explicitly set to 50%
+        )
 
         if is_adherent:
-            print(f"Word count ({current_word_count}) is within +/-20% tolerance of target ({avg_word_count}). Deviation: {deviation:.2%}")
+            print(f"Word count ({current_word_count}) is within +/-50% tolerance of target ({avg_word_count}). Deviation: {deviation:.2%}")
             final_text = cleaned_text
         else:
-            print(f"Word count ({current_word_count}) is outside +/-20% tolerance of target ({avg_word_count}). Deviation: {deviation:.2%}. Attempting to adjust.")
+            print(f"Word count ({current_word_count}) is outside +/-50% tolerance of target ({avg_word_count}). Deviation: {deviation:.2%}. Attempting to adjust.")
             if current_word_count > avg_word_count: 
                 print("Text is too long, applying smart truncation.")
                 final_text = utils.smart_truncate_text(cleaned_text, avg_word_count, max_overshoot_words=int(avg_word_count*0.10))

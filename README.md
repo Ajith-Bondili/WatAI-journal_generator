@@ -6,7 +6,6 @@ This project generates synthetic daily journal entries using a Large Language Mo
 
 ## Features
 
-*   **LLM-Powered Generation:** Uses Google's Gemini 1.5 Flash model via API to generate journal entries as its cheap and relatively low latency
 *   **Configurable Output:** Allows users to specify the number of days, entries per day, average word count, and desired emotional tone as well as many other parameters
 *   **Emotion-Driven Prompts:** Can use examples from a seed dataset (Journal Entries with Labelled Emotions from Kaggle) for few-shot prompting to guide the LLM towards a specific emotional style.
 *   **Unique File Naming:** Saves each entry as an individual `.txt` file with a unique timestamp-based name (e.g., `journal_YYYYMMDD_HHMMSSffffff.txt`) to prevent overwrites and ensure traceability.
@@ -95,15 +94,11 @@ Follow these steps to set up and run the journal generator:
 
 **6. (Optional) Seed Data for Few-Shot Prompting:**
    The project includes a dataset for few-shot prompting (highly recommended for better tone control) in the `journal_generator/data/` directory. This dataset was sourced from [madhavmalhotra/journal-entries-with-labelled-emotions](https://www.kaggle.com/datasets/madhavmalhotra/journal-entries-with-labelled-emotions) on Kaggle.
-   *   The included `data.csv` file contains journal entries labeled with one or more of the following emotions: `accomplished`, `afraid`, `anxious`, `disappointed`, `excited`, `frustrated`, `grateful`, `happy`, `inspired`, `lonely`, `love`, `motivated`, `nostalgic`, `proud`, `reflective`, `sad`, `stressed`, `surprised`.
-   *   If you set `--num_examples_prompt 0`, the generator will still work but without dataset-specific examples in prompts.
 
 ## How it Works
 
 1.  **Initialization (`src/main.py`):**
-    *   Parses command-line arguments.
-    *   Loads environment variables (including the `GOOGLE_API_KEY`) using `python-dotenv`.
-    *   Optionally loads and preprocesses the seed data from `data/data.csv` using `src/data_loader.py` if few-shot examples are requested.
+    *   Loads and preprocesses the seed data from `data/data.csv` using `src/data_loader.py` if few-shot examples are requested.
     *   Initializes the `JournalGenerator` (`src/generator.py`) which configures the Gemini API client.
     *   Initializes the `JournalExporter` (`src/exporter.py`) for saving entries.
 
@@ -118,7 +113,7 @@ Follow these steps to set up and run the journal generator:
 
 3.  **Saving Entries (`src/exporter.py`):**
     *   Each processed journal entry is passed to the `JournalExporter`.
-    *   `src/utils.py` generates a unique filename using the current timestamp: `get_current_datetime_str_for_file_id()` produces a `YYYYMMDD_HHMMSSffffff` string.
+    *   `src/utils.py` generates a unique filename using the current timestamp:
     *   `construct_filename()` creates the final name, e.g., `journal_YYYYMMDD_HHMMSSffffff.txt`.
     *   The entry is saved as a `.txt` file in the specified output directory (default: `generated_entries/`).
 
@@ -143,9 +138,8 @@ After activating your virtual environment (`source venv/bin/activate`) and insta
 
 *   `--tone <emotion>`: Desired tone/emotion for the entries.
     *   This argument is **required**.
-    *   The chosen emotion **must be one of the 18 specific emotions** available in the seed dataset (if used for examples) and supported by the script. These are used to guide the LLM.
-    *   Available choices: `accomplished`, `afraid`, `anxious`, `disappointed`, `excited`, `frustrated`, `grateful`, `happy`, `inspired`, `lonely`, `love`, `motivated`, `nostalgic`, `proud`, `reflective`, `sad`, `stressed`, `surprised`.
-    *   Example: `python src/main.py --tone "happy"`
+    *   The chosen emotion **must be one of the 18 specific emotions** available in the seed dataset (if used for examples) and supported by the script.
+    *   Available choices: `afraid`, `angry`, `anxious`, `ashamed`, `awkward`, `bored`, `calm`, `confused`, `disgusted`, `excited`, `frustrated`, `happy`, `jealous`, `nostalgic`, `proud`, `sad`, `satisfied`, `surprised`.
 
 **Optional Arguments:**
 
@@ -159,7 +153,6 @@ After activating your virtual environment (`source venv/bin/activate`) and insta
 
 **Example Usage:**
 
-Generate 2 entries per day for 3 days, with a "reflective" tone, aiming for 150 words each, using 2 examples for prompting, and saving to `my_journals/`:
 ```bash
 python src/main.py --entries_per_day 3 --avg_word_count 200 --tone "awkward"
 ```
@@ -168,15 +161,12 @@ python src/main.py --entries_per_day 3 --avg_word_count 200 --tone "awkward"
 
 The project uses `pytest` for unit testing.
 
-**1. Install Pytest:**
-   `pytest` is included in `requirements.txt`, so it should be installed when you set up your environment.
-
-**2. Run Tests:**
+**1. Run Tests:**
    Navigate to the project root directory (`journal_generator/`) in your terminal (with the virtual environment activated) and run:
    ```bash
    pytest
    ```
-   `pytest` will automatically discover and run all tests in the `tests/` directory. Ensure NLTK's `punkt` resource is downloaded as mentioned in the setup.
+   `pytest` Ensure NLTK's `punkt` resource is downloaded as mentioned in the setup.
 
 **Test File Overview:**
 
@@ -185,8 +175,6 @@ The project uses `pytest` for unit testing.
 *   `tests/test_generator.py`: Checks the core journal entry generation logic, including prompt creation and (mocked) LLM API interactions.
 *   `tests/test_main.py`: Tests the command-line interface, argument parsing, and the main script's orchestration of the generation process.
 *   `tests/test_utils.py`: Validates various helper functions for text manipulation (cleaning, truncation) and utility tasks (like file naming).
-
-This should provide a solid foundation for understanding and using your project! 
 
 ## Developer Notes & Reflections
 
