@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This project generates synthetic daily journal entries using a Large Language Model (LLM). The primary goal is to create plausible and stylistically consistent journal data that can be used for downstream tasks, such as training tonal-analysis models. It leverages the Google Gemini API (specifically `gemini-1.5-flash-latest`) for text generation.
+This project generates synthetic daily journal entries using a Large Language Model (LLM). The primary goal is to create plausible and stylistically consistent journal data that can be used for downstream tasks, such as training tonal-analysis models.
 
 ## Features
 
@@ -11,7 +11,7 @@ This project generates synthetic daily journal entries using a Large Language Mo
 *   **Emotion-Driven Prompts:** Can use examples from a seed dataset (Journal Entries with Labelled Emotions from Kaggle) for few-shot prompting to guide the LLM towards a specific emotional style.
 *   **Unique File Naming:** Saves each entry as an individual `.txt` file with a unique timestamp-based name (e.g., `journal_YYYYMMDD_HHMMSSffffff.txt`) to prevent overwrites and ensure traceability.
 *   **Text Processing:** Includes utilities for basic text cleaning and smart truncation to adhere to word count targets.
-*   **Command-Line Interface:** Easy to run and configure via CLI arguments.
+*   **Command-Line Interface:** Easy to run and configure via CLI arguments, as well the CLI displays the what's going on in the pipeline and useful metadata.
 *   **Unit Tests:** Includes a suite of unit tests using `pytest` to ensure code quality and correctness.
 
 ## Directory Structure
@@ -94,11 +94,9 @@ Follow these steps to set up and run the journal generator:
    *   **Important:** The `.env` file is listed in `.gitignore`, so your API key will not be committed to version control.
 
 **6. (Optional) Seed Data for Few-Shot Prompting:**
-   If you want to use the few-shot prompting feature (highly recommended for better tone control), download the "Journal Entries with Labelled Emotions" dataset from Kaggle:
-   *   [madhavmalhotra/journal-entries-with-labelled-emotions](https://www.kaggle.com/datasets/madhavmalhotra/journal-entries-with-labelled-emotions)
-   *   Place the `data.csv` file into the `journal_generator/data/` directory.
-   *   The dataset contains entries labeled with one or more of the following emotions: `accomplished`, `afraid`, `anxious`, `disappointed`, `excited`, `frustrated`, `grateful`, `happy`, `inspired`, `lonely`, `love`, `motivated`, `nostalgic`, `proud`, `reflective`, `sad`, `stressed`, `surprised`.
-   *   If you do not provide this file or set `--num_examples_prompt 0`, the generator will still work but without dataset-specific examples in prompts.
+   The project includes a dataset for few-shot prompting (highly recommended for better tone control) in the `journal_generator/data/` directory. This dataset was sourced from [madhavmalhotra/journal-entries-with-labelled-emotions](https://www.kaggle.com/datasets/madhavmalhotra/journal-entries-with-labelled-emotions) on Kaggle.
+   *   The included `data.csv` file contains journal entries labeled with one or more of the following emotions: `accomplished`, `afraid`, `anxious`, `disappointed`, `excited`, `frustrated`, `grateful`, `happy`, `inspired`, `lonely`, `love`, `motivated`, `nostalgic`, `proud`, `reflective`, `sad`, `stressed`, `surprised`.
+   *   If you set `--num_examples_prompt 0`, the generator will still work but without dataset-specific examples in prompts.
 
 ## How it Works
 
@@ -139,11 +137,7 @@ This ensures that each generated file has a unique name.
 
 ## Running the Script
 
-Activate your virtual environment first (`source venv/bin/activate`). Then, run the main script from the project root directory:
-
-```bash
-python src/main.py --tone <emotion> [OPTIONS]
-```
+After activating your virtual environment (`source venv/bin/activate`) and installing the requirements.txt (`pip install -r requirments.txt`). Then, run the main script from the project root directory:
 
 **Required Argument:**
 
@@ -184,6 +178,14 @@ The project uses `pytest` for unit testing.
    ```
    `pytest` will automatically discover and run all tests in the `tests/` directory. Ensure NLTK's `punkt` resource is downloaded as mentioned in the setup.
 
+**Test File Overview:**
+
+*   `tests/test_data_loader.py`: Verifies loading and preprocessing of seed data, and correct retrieval of emotional example entries.
+*   `tests/test_exporter.py`: Ensures generated journal entries are correctly saved to files with proper naming and directory structure.
+*   `tests/test_generator.py`: Checks the core journal entry generation logic, including prompt creation and (mocked) LLM API interactions.
+*   `tests/test_main.py`: Tests the command-line interface, argument parsing, and the main script's orchestration of the generation process.
+*   `tests/test_utils.py`: Validates various helper functions for text manipulation (cleaning, truncation) and utility tasks (like file naming).
+
 This should provide a solid foundation for understanding and using your project! 
 
 ## Developer Notes & Reflections
@@ -196,8 +198,8 @@ Initially, I considered a simple global counter for unique IDs for the journal e
 **LLM Choices & Local vs. API:**
 The journey with LLMs involved a few iterations:
 *   I started by looking into smaller, locally runnable models like Google's Flan-T5.
-*   Then, I explored popular models on Hugging Face, such as those from the `sharavsambuu` LLaMA fine-tunes, and later considered options like `deepseek-coder-6.7b-instruct`.
-*   The large size of more powerful models (like a 19B LLaMA variant) made local execution challenging and prompted thoughts of migrating to Google Colab for more GPU resources.
+*   Then, I explored popular models on Hugging Face, such as `sarvamai/sarvam-m` and later considered options like `deepseek-ai/DeepSeek-R1-Distill-Llama-8B`.
+*   The large size of more powerful models made local execution challenging and prompted thoughts of migrating to Google Colab for more GPU resources.
 *   Ultimately, for this project, I opted to use the Google Gemini API (specifically `gemini-1.5-flash-latest`). This proved to be a practical choice due to its ease of use, cost-effectiveness (with a generous free tier that's unlikely to be exhausted for typical use cases of this script), and strong generative capabilities without the overhead of local model management.
 
 **Controlling Average Word Count:**
