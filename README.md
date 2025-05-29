@@ -6,13 +6,12 @@ This project generates synthetic daily journal entries using a Large Language Mo
 
 ## Features
 
-*   **LLM-Powered Generation:** Uses Google's Gemini 1.5 Flash model via API to generate journal entries.
-*   **Configurable Output:** Allows users to specify the number of days, entries per day, average word count, and desired emotional tone.
+*   **LLM-Powered Generation:** Uses Google's Gemini 1.5 Flash model via API to generate journal entries as its cheap and relatively low latency
+*   **Configurable Output:** Allows users to specify the number of days, entries per day, average word count, and desired emotional tone as well as many other parameters
 *   **Emotion-Driven Prompts:** Can use examples from a seed dataset (Journal Entries with Labelled Emotions from Kaggle) for few-shot prompting to guide the LLM towards a specific emotional style.
 *   **Unique File Naming:** Saves each entry as an individual `.txt` file with a unique timestamp-based name (e.g., `journal_YYYYMMDD_HHMMSSffffff.txt`) to prevent overwrites and ensure traceability.
 *   **Text Processing:** Includes utilities for basic text cleaning and smart truncation to adhere to word count targets.
 *   **Command-Line Interface:** Easy to run and configure via CLI arguments.
-*   **Modular Structure:** Code is organized into modules for data loading, generation, exporting, and utilities.
 *   **Unit Tests:** Includes a suite of unit tests using `pytest` to ensure code quality and correctness.
 
 ## Directory Structure
@@ -98,6 +97,7 @@ Follow these steps to set up and run the journal generator:
    If you want to use the few-shot prompting feature (highly recommended for better tone control), download the "Journal Entries with Labelled Emotions" dataset from Kaggle:
    *   [madhavmalhotra/journal-entries-with-labelled-emotions](https://www.kaggle.com/datasets/madhavmalhotra/journal-entries-with-labelled-emotions)
    *   Place the `data.csv` file into the `journal_generator/data/` directory.
+   *   The dataset contains entries labeled with one or more of the following emotions: `accomplished`, `afraid`, `anxious`, `disappointed`, `excited`, `frustrated`, `grateful`, `happy`, `inspired`, `lonely`, `love`, `motivated`, `nostalgic`, `proud`, `reflective`, `sad`, `stressed`, `surprised`.
    *   If you do not provide this file or set `--num_examples_prompt 0`, the generator will still work but without dataset-specific examples in prompts.
 
 ## How it Works
@@ -185,3 +185,23 @@ The project uses `pytest` for unit testing.
    `pytest` will automatically discover and run all tests in the `tests/` directory. Ensure NLTK's `punkt` resource is downloaded as mentioned in the setup.
 
 This should provide a solid foundation for understanding and using your project! 
+
+## Developer Notes & Reflections
+
+This section includes some thoughts and challenges encountered during the development of this journal generator.
+
+**Unique ID Generation:**
+Initially, I considered a simple global counter for unique IDs for the journal entries. However, I quickly realized this approach could lead to ID collisions if the script were run multiple times, as the counter would reset. The current solution uses a timestamp-based approach (`YYYYMMDD_HHMMSSffffff`) to generate unique filenames, which is far more robust for preventing overwrites.
+
+**LLM Choices & Local vs. API:**
+The journey with LLMs involved a few iterations:
+*   I started by looking into smaller, locally runnable models like Google's Flan-T5.
+*   Then, I explored popular models on Hugging Face, such as those from the `sharavsambuu` LLaMA fine-tunes, and later considered options like `deepseek-coder-6.7b-instruct`.
+*   The large size of more powerful models (like a 19B LLaMA variant) made local execution challenging and prompted thoughts of migrating to Google Colab for more GPU resources.
+*   Ultimately, for this project, I opted to use the Google Gemini API (specifically `gemini-1.5-flash-latest`). This proved to be a practical choice due to its ease of use, cost-effectiveness (with a generous free tier that's unlikely to be exhausted for typical use cases of this script), and strong generative capabilities without the overhead of local model management.
+
+**Controlling Average Word Count:**
+Getting an LLM to adhere strictly to an "average word count" is trickier than it sounds. LLMs process text in terms of *tokens*, not words, and don't have an innate concept of word counts in the same way humans do.
+*   Simply instructing the LLM to generate a certain number of words often yields approximate results.
+*   More advanced solutions could involve creating a multi-step "agent" where one part of the LLM generates text and another refines it for length, or using a reasoning model to "think" about the length. However, these approaches can significantly increase computational expense and API costs.
+*   The current solution takes a pragmatic approach: the prompt requests an *approximate* word count, and a post-generation utility function (`smart_truncate_text` in `utils.py`) is used. If the generated text's word count exceeds the target by more than a certain tolerance (e.g., 20%), it's truncated. If it's within a reasonable range (e.g., up to 20% over), it's considered acceptable. This balances output quality with simplicity and cost.
